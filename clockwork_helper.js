@@ -1,14 +1,14 @@
 // ==UserScript==
 // @name         Clockwork Codebreaker Helper
 // @namespace    GreaseMonkey
-// @version      1.0
+// @version      1.1
 // @description  Helper for the game Clockwork Codebreaker that deduces the right combination
-// @author       @willnjohnson
+// @author       @willnjohnson + Updated
 // @match        *://*.neopets.com/games/game.phtml?game_id=1173*
 // @grant        none
 // ==/UserScript==
 
-(function() {
+(function () {
     'use strict';
 
     const stages = {
@@ -17,10 +17,9 @@
         3: { slots: 6, colors: ['BLANK', 'SILVER', 'PURPLE', 'MAGENTA', 'CYAN', 'GREEN', 'YELLOW', 'ORANGE', 'RED'] }
     };
 
-    let stage, guessColors = [], slots = 0, feedback = [], currentGuess = '';
+    let stage = null, guessColors = [], slots = 0, currentGuess = '', feedback = [], lastFeedback = null;
     const state = { usedColors: [], discoveryMode: true, attempt: 0, possibleCodes: [] };
 
-    // Create UI
     const ui = document.createElement('div');
     Object.assign(ui.style, {
         position: 'fixed', top: '10px', right: '10px', backgroundColor: '#222', color: 'white',
@@ -48,12 +47,18 @@
         btn.style.marginLeft = '5px';
         styleButton(btn, '#00e0ff', true);
         btn.onclick = () => {
+            if (stage === n) return;
+            resetToStageSelection();
             initStage(n);
             tableWrapper.style.display = 'block';
             infoDisplay.style.display = 'block';
             ui.style.minHeight = '240px';
-            [...stageButtons.children].forEach(b => { b.style.backgroundColor = '#444'; b.disabled = true; });
+            [...stageButtons.children].forEach(b => {
+                b.style.backgroundColor = '#444';
+                b.disabled = false;
+            });
             btn.style.backgroundColor = '#00e0ff';
+            btn.disabled = true;
         };
         stageButtons.appendChild(btn);
     });
@@ -103,11 +108,15 @@
         tableWrapper.style.display = 'none';
         infoDisplay.style.display = 'none';
         ui.style.minHeight = '80px';
-        [...stageButtons.children].forEach(b => { b.style.backgroundColor = '#444'; b.disabled = false; });
+        [...stageButtons.children].forEach(b => {
+            b.style.backgroundColor = '#444';
+            b.disabled = false;
+        });
         tbody.innerHTML = '';
         stage = null;
         guessColors = [];
         feedback = [];
+        lastFeedback = null;
         slots = 0;
         currentGuess = '';
         Object.assign(state, { usedColors: [], discoveryMode: true, attempt: 0, possibleCodes: [] });
@@ -118,56 +127,53 @@
         stage = n;
         guessColors = [];
         feedback = [];
+        lastFeedback = null;
         slots = stages[n].slots;
         const colors = stages[n].colors;
-        
-        Object.assign(state, { usedColors: [], discoveryMode: true, attempt: 0, possibleCodes: generateCodes(colors, slots) });
+        Object.assign(state, {
+            usedColors: [], discoveryMode: true, attempt: 0,
+            possibleCodes: generateCodes(colors, slots)
+        });
         tbody.innerHTML = '';
 
-        Array.from({ length: slots }, (_, i) => {
+        for (let i = 0; i < slots; i++) {
             const row = document.createElement('tr');
 
             const colorCell = document.createElement('td');
-            Object.assign(colorCell.style, { padding: '4px', textAlign: 'center', verticalAlign: 'middle', height: '32px' });
             const color = document.createElement('div');
             color.textContent = 'BLANK';
-            colorCell.appendChild(color);
             guessColors.push(color);
+            colorCell.appendChild(color);
+            row.appendChild(colorCell);
 
             const fbCell = document.createElement('td');
-            Object.assign(fbCell.style, { padding: '4px', textAlign: 'center', verticalAlign: 'middle', height: '32px' });
             const fbWrapper = document.createElement('div');
-            Object.assign(fbWrapper.style, { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' });
+            Object.assign(fbWrapper.style, { display: 'flex', justifyContent: 'center', gap: '8px' });
 
-            const [upBtn, status, downBtn] = ['▲', '❔', '▼'].map((text, idx) => {
-                if (idx === 1) {
-                    const span = document.createElement('span');
-                    span.textContent = text;
-                    span.dataset.index = i;
-                    return span;
-                }
-                const btn = document.createElement('button');
-                btn.textContent = text;
-                styleButton(btn, '#666', true);
-                return btn;
-            });
-
-            const cycles = [['🔴', '🟡', '🟢'], ['🟢', '🟡', '🔴']];
-            [upBtn, downBtn].forEach((btn, idx) => {
-                btn.onclick = () => {
-                    const cycle = cycles[idx];
-                    const pos = cycle.indexOf(status.textContent.trim());
-                    status.textContent = cycle[(pos + 1) % 3] || cycle[0];
-                    infoDisplay.textContent = '';
+            const fbGroup = [];
+            ['🟢', '🟡', '🔴'].forEach(symbol => {
+                const square = document.createElement('div');
+                square.textContent = symbol;
+                square.dataset.index = i;
+                Object.assign(square.style, {
+                    width: '26px', height: '26px', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', borderRadius: '6px', backgroundColor: '#333',
+                    cursor: 'pointer', fontSize: '18px', border: '2px solid transparent'
+                });
+                square.onclick = () => {
+                    fbGroup.forEach(el => el.style.borderColor = 'transparent');
+                    square.style.borderColor = '#00e0ff';
+                    fbGroup.selected = symbol;
                 };
+                fbGroup.push(square);
+                fbWrapper.appendChild(square);
             });
 
-            fbWrapper.append(upBtn, status, downBtn);
+            feedback.push(fbGroup);
             fbCell.appendChild(fbWrapper);
+            row.appendChild(fbCell);
 
             const actionCell = document.createElement('td');
-            Object.assign(actionCell.style, { padding: '4px', textAlign: 'right', verticalAlign: 'middle', height: '32px' });
-
             if (i === 0) {
                 const testBtn = document.createElement('button');
                 testBtn.textContent = 'Test';
@@ -180,67 +186,83 @@
                 styleButton(resetBtn, '#ff4c4c', true);
                 resetBtn.onclick = resetToStageSelection;
                 actionCell.appendChild(resetBtn);
+            } else if (i === 3) {
+                const restoreBtn = document.createElement('button');
+                restoreBtn.textContent = 'Select Prev.';
+                styleButton(restoreBtn, '#00e0ff', true);
+                restoreBtn.onclick = () => {
+                    const restore = lastFeedback || Array(slots).fill('🔴');
+                    feedback.forEach((group, i) => {
+                        group.forEach(el => el.style.borderColor = 'transparent');
+                        const match = group.find(el => el.textContent === restore[i]);
+                        if (match) {
+                            match.style.borderColor = '#00e0ff';
+                            group.selected = restore[i];
+                        }
+                    });
+                };
+                actionCell.appendChild(restoreBtn);
             }
-
-            row.append(colorCell, fbCell, actionCell);
+            row.appendChild(actionCell);
             tbody.appendChild(row);
-            feedback.push(status);
-        });
+        }
 
         suggestNextGuess();
     }
 
     function suggestNextGuess() {
         const colors = stages[stage].colors;
-        
         if (state.discoveryMode) {
             const nextColor = colors.find(c => !state.usedColors.includes(c));
             currentGuess = nextColor ? Array(slots).fill(nextColor) : (state.discoveryMode = false, state.possibleCodes[0] || Array(slots).fill(colors[1]));
         } else {
             currentGuess = state.possibleCodes[0] || Array(slots).fill(colors[1]);
         }
-
         guessColors.forEach((el, i) => el.textContent = currentGuess[i] || 'BLANK');
     }
 
     function runTest() {
-        if (feedback.some(f => f.textContent === '❔')) {
+        const selected = feedback.map(group => group.selected);
+        if (selected.includes(undefined)) {
             infoDisplay.style.color = '#ff4c4c';
             infoDisplay.textContent = 'Please set all indicator results first.';
             return;
         }
-
-        const [greens, yellows, reds] = ['🟢', '🟡', '🔴'].map(emoji => feedback.filter(f => f.textContent === emoji).length);
-
+        lastFeedback = [...selected];
+        const [greens, yellows, reds] = [
+            selected.filter(f => f === '🟢').length,
+            selected.filter(f => f === '🟡').length,
+            selected.filter(f => f === '🔴').length
+        ];
         if (greens === slots) {
             infoDisplay.style.color = '#00e0ff';
-            infoDisplay.textContent = 'Puzzle Solved! Select Reset for new stage.';
+            infoDisplay.textContent = 'Puzzle Solved!';
             tbody.querySelector('button').disabled = true;
             return;
         }
-
-        infoDisplay.textContent = '';
         const guess = Array.isArray(currentGuess) ? currentGuess : Array(slots).fill(stages[stage].colors[1]);
-
         if (state.discoveryMode) {
             const testedColor = guess[0];
             if (!state.usedColors.includes(testedColor)) state.usedColors.push(testedColor);
         }
-
         if (state.discoveryMode && (greens > 0 || yellows > 0)) state.discoveryMode = false;
-
         state.possibleCodes = state.possibleCodes.filter(code => {
             const [g, y, r] = getFeedback(guess, code);
             return g === greens && y === yellows && r === reds;
         });
-
         suggestNextGuess();
-        feedback.forEach(f => f.textContent = '❔');
+        feedback.forEach(group => {
+            group.forEach(el => el.style.borderColor = 'transparent');
+            group.selected = undefined;
+        });
     }
 
     function getFeedback(guess, solution) {
         const green = guess.filter((g, i) => g === solution[i]).length;
-        const count = arr => arr.reduce((acc, item) => ({ ...acc, [item]: (acc[item] || 0) + 1 }), {});
+        const count = arr => arr.reduce((acc, item) => {
+            acc[item] = (acc[item] || 0) + 1;
+            return acc;
+        }, {});
         const [guessCount, solCount] = [count(guess), count(solution)];
         const common = Object.keys(guessCount).reduce((sum, key) => sum + Math.min(guessCount[key] || 0, solCount[key] || 0), 0);
         const yellow = common - green;
