@@ -56,7 +56,7 @@ This script requires a user script manager like Tampermonkey or Greasemonkey.
 
 2. The Clockwork Codebreaker Helper will appear on the top-right. Choose your stage (1, 2, or 3).
 
-3. Use the arrow buttons to update feedback indicators (🔴🟡🟢).
+3. Select one indicator (🔴🟡🟢) for each row.
 
 4. Click **Test** to see what combination is suggested for your next move.
 
