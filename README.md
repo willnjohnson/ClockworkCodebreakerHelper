@@ -62,7 +62,7 @@ This script requires a user script manager like Tampermonkey or Greasemonkey.
 
 5. Repeat testing until the helper narrows down the correct combination.
 
-6. Once the puzzle is solved, click **Reset** and select the next stage.
+6. Once the puzzle is solved, select the next stage.
 
 ## Compatibility
 
