@@ -18,11 +18,14 @@ Enjoy, and hope you earn that easy gold trophy!
   * User provides feedback by input into the helper what color the signals are.
 
 * **Interactive Feedback Panel:**
-  * Click ▲ or ▼ to cycle through indicator results (🔴 red, 🟡 yellow, 🟢 green).
+  * Select indicator results (🔴 red, 🟡 yellow, 🟢 green).
   * Automatically filters out invalid combinations after each test.
 
 * **Reset:**
   * When a stage is completed, you can select the Reset button and select the next stage.
+
+* **Select Prev.:**
+  * Select previous indicators as quick shortcut, if your current prediction is similar to your previous prediction.
 
 ## Installation
 
